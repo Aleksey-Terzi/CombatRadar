@@ -1,0 +1,12 @@
+{
+    "required": true,
+    "minVersion": "0.5.3",
+    "package": "com.aleksey.combatradar.mixin",
+    "refmap": "mixins.combatradar.refmap.json",
+    "mixins": [
+        "MixinGuiMainMenu"
+    ],
+    "injectors": {
+        "defaultRequire": 1
+    }
+}

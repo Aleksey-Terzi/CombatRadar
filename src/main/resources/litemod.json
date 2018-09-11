@@ -1,0 +1,9 @@
+{
+    "name": "combatradar",
+    "version": 0.0,
+    "mcversion": "1.12.2",
+    "author": "Aleksey Terzi",
+    "mixinConfigs": [
+        "mixins.combatradar.json"
+    ]
+}
