@@ -3,6 +3,7 @@ package com.aleksey.combatradar.gui;
 import com.aleksey.combatradar.config.PlayerType;
 import com.aleksey.combatradar.config.PlayerTypeInfo;
 import com.aleksey.combatradar.config.RadarConfig;
+import com.aleksey.combatradar.config.SoundInfo;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import org.lwjgl.input.Keyboard;
@@ -14,8 +15,11 @@ import java.awt.*;
  */
 public class GuiPlayerSettingsScreen extends GuiScreen {
     private static final int BUTTON_ID_PING_NEUTRAL = 1;
-    private static final int BUTTON_ID_PING_ALLY = 2;
-    private static final int BUTTON_ID_PING_ENEMY = 3;
+    private static final int BUTTON_ID_SOUND_NEUTRAL = 2;
+    private static final int BUTTON_ID_PING_ALLY = 3;
+    private static final int BUTTON_ID_SOUND_ALLY = 4;
+    private static final int BUTTON_ID_PING_ENEMY = 5;
+    private static final int BUTTON_ID_SOUND_ENEMY = 6;
     private static final int BUTTON_ID_DONE = 100;
 
     private RadarConfig _config;
@@ -29,9 +33,12 @@ public class GuiPlayerSettingsScreen extends GuiScreen {
     private GuiSlider _enemyRedSlider;
     private GuiSlider _enemyGreenSlider;
     private GuiSlider _enemyBlueSlider;
-    private GuiButton _neutralButton;
-    private GuiButton _allyButton;
-    private GuiButton _enemyButton;
+    private GuiButton _neutralPingButton;
+    private GuiButton _neutralSoundButton;
+    private GuiButton _allyPingButton;
+    private GuiButton _allySoundButton;
+    private GuiButton _enemyPingButton;
+    private GuiButton _enemySoundButton;
 
     public GuiPlayerSettingsScreen(GuiScreen parent, RadarConfig config) {
         _parent = parent;
@@ -63,11 +70,14 @@ public class GuiPlayerSettingsScreen extends GuiScreen {
         this.buttonList.add(_enemyGreenSlider = new GuiSlider(0, x + 66 + 1, y, 66, 1, 0, "Green", enemyInfo.color.getGreen() / 255f, false));
         this.buttonList.add(_enemyBlueSlider = new GuiSlider(0, x + 66 + 1 + 66 + 1, y, 66, 1, 0, "Blue", enemyInfo.color.getBlue() / 255f, false));
         y += 24;
-        this.buttonList.add(_neutralButton = new GuiButton(BUTTON_ID_PING_NEUTRAL, x, y, 200, 20, "Neutral Player Ping"));
+        this.buttonList.add(_neutralPingButton = new GuiButton(BUTTON_ID_PING_NEUTRAL, x, y, 133, 20, "Neutral Player Ping"));
+        this.buttonList.add(_neutralSoundButton = new GuiButton(BUTTON_ID_SOUND_NEUTRAL, x + 133 + 1, y, 66, 20, "Sound"));
         y += 24;
-        this.buttonList.add(_allyButton = new GuiButton(BUTTON_ID_PING_ALLY, x, y, 200, 20, "Ally Player Ping"));
+        this.buttonList.add(_allyPingButton = new GuiButton(BUTTON_ID_PING_ALLY, x, y, 133, 20, "Ally Player Ping"));
+        this.buttonList.add(_allySoundButton = new GuiButton(BUTTON_ID_SOUND_ALLY, x + 133 + 1, y, 66, 20, "Sound"));
         y += 24;
-        this.buttonList.add(_enemyButton = new GuiButton(BUTTON_ID_PING_ENEMY, x, y, 200, 20, "Enemy Player Ping"));
+        this.buttonList.add(_enemyPingButton = new GuiButton(BUTTON_ID_PING_ENEMY, x, y, 133, 20, "Enemy Player Ping"));
+        this.buttonList.add(_enemySoundButton = new GuiButton(BUTTON_ID_SOUND_ENEMY, x + 133 + 1, y, 66, 20, "Sound"));
         y += 24;
         this.buttonList.add(new GuiButton(BUTTON_ID_DONE, x, y, 200, 20, "Done"));
     }
@@ -83,11 +93,20 @@ public class GuiPlayerSettingsScreen extends GuiScreen {
             case BUTTON_ID_PING_NEUTRAL:
                 changePingPlayerType = PlayerType.Neutral;
                 break;
+            case BUTTON_ID_SOUND_NEUTRAL:
+                mc.displayGuiScreen(new GuiChooseSoundScreen(this, _config, PlayerType.Neutral));
+                break;
             case BUTTON_ID_PING_ALLY:
                 changePingPlayerType = PlayerType.Ally;
                 break;
+            case BUTTON_ID_SOUND_ALLY:
+                mc.displayGuiScreen(new GuiChooseSoundScreen(this, _config, PlayerType.Ally));
+                break;
             case BUTTON_ID_PING_ENEMY:
                 changePingPlayerType = PlayerType.Enemy;
+                break;
+            case BUTTON_ID_SOUND_ENEMY:
+                mc.displayGuiScreen(new GuiChooseSoundScreen(this, _config, PlayerType.Enemy));
                 break;
             case BUTTON_ID_DONE:
                 mc.displayGuiScreen(_parent);
@@ -116,9 +135,16 @@ public class GuiPlayerSettingsScreen extends GuiScreen {
         if(isChanged)
             _config.save();
 
-        _neutralButton.displayString = "Neutral Player Ping: " + (_config.getPlayerTypeInfo(PlayerType.Neutral).ping ? "On" : "Off");
-        _allyButton.displayString = "Ally Player Ping: " + (_config.getPlayerTypeInfo(PlayerType.Ally).ping ? "On" : "Off");
-        _enemyButton.displayString = "Enemy Player Ping: " + (_config.getPlayerTypeInfo(PlayerType.Enemy).ping ? "On" : "Off");
+        PlayerTypeInfo neutralPlayer = _config.getPlayerTypeInfo(PlayerType.Neutral);
+        PlayerTypeInfo allyPlayer = _config.getPlayerTypeInfo(PlayerType.Ally);
+        PlayerTypeInfo enemyPlayer = _config.getPlayerTypeInfo(PlayerType.Enemy);
+
+        _neutralPingButton.displayString = "Neutral Player Ping: " + (neutralPlayer.ping ? "On" : "Off");
+        _neutralSoundButton.displayString = SoundInfo.getByValue(neutralPlayer.soundEventName).name;
+        _allyPingButton.displayString = "Ally Player Ping: " + (allyPlayer.ping ? "On" : "Off");
+        _allySoundButton.displayString = SoundInfo.getByValue(allyPlayer.soundEventName).name;
+        _enemyPingButton.displayString = "Enemy Player Ping: " + (enemyPlayer.ping ? "On" : "Off");
+        _enemySoundButton.displayString = SoundInfo.getByValue(enemyPlayer.soundEventName).name;
     }
 
     private boolean changeColor(PlayerType playerType, Color color) {

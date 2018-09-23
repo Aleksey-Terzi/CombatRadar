@@ -1,7 +1,5 @@
 package com.aleksey.combatradar.config;
 
-import com.aleksey.combatradar.history.PlayerAppearanceInfo;
-import com.aleksey.combatradar.history.PlayerAppearanceLoader;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.boss.EntityWither;
@@ -33,7 +31,6 @@ public class RadarConfig {
     }
 
     private File _configFile;
-    private File _playerAppearanceFile;
     private KeyBinding _settingsKey;
     private boolean _enabled = true;
     private float _radarOpacity = 0.5f;
@@ -46,11 +43,15 @@ public class RadarConfig {
     private float _fontScale = 1.4f;
     private boolean _showPlayerNames = true;
     private boolean _showExtraPlayerInfo = true;
+    private boolean _logPlayerStatus = true;
     private List<RadarEntityInfo> _entities;
     private Map<GroupType, Boolean> _groups;
     private Map<String, PlayerInfo> _players;
     private Map<PlayerType, PlayerTypeInfo> _playerTypes;
-    private Map<String, PlayerAppearanceInfo> _playerAppearances;
+
+    // Calculated settings
+    private boolean _isJourneyMapEnabled;
+    private boolean _isVoxelMapEnabled;
 
     public KeyBinding getSettingsKey() { return _settingsKey; }
 
@@ -130,6 +131,9 @@ public class RadarConfig {
 
     public boolean getShowExtraPlayerInfo() { return _showExtraPlayerInfo; }
     public void setShowExtraPlayerInfo(boolean value) { _showExtraPlayerInfo = value; }
+
+    public boolean getLogPlayerStatus() { return _logPlayerStatus; }
+    public void setLogPlayerStatus(boolean value) { _logPlayerStatus = value; }
 
     public List<RadarEntityInfo> getEntities() { return _entities; }
 
@@ -221,40 +225,14 @@ public class RadarConfig {
         return result;
     }
 
-    public List<PlayerAppearanceInfo> getPlayerAppearances() {
-        List<PlayerAppearanceInfo> result = new ArrayList<PlayerAppearanceInfo>();
+    public boolean getIsJourneyMapEnabled() { return _isJourneyMapEnabled; }
+    public void setIsJourneyMapEnabled(boolean value) { _isJourneyMapEnabled = value; }
 
-        for(PlayerAppearanceInfo info : _playerAppearances.values()) {
-            result.add(info);
-        }
+    public boolean getIsVoxelMapEnabled() { return _isVoxelMapEnabled; }
+    public void setIsVoxelMapEnabled(boolean value) { _isVoxelMapEnabled = value; }
 
-        result.sort(new PlayerAppearanceInfo.PlayerAppearanceComparator());
-
-        return result;
-    }
-
-    public void addPlayerAppearance(String playerName, int x, int y, int z) {
-        PlayerAppearanceInfo info = new PlayerAppearanceInfo();
-        info.time = new Date().getTime();
-        info.playerName = playerName;
-        info.x = x;
-        info.y = y;
-        info.z = z;
-
-        _playerAppearances.put(playerName.toLowerCase(), info);
-    }
-
-    public void loadPlayerAppearances() {
-        PlayerAppearanceLoader.load(_playerAppearances, _playerAppearanceFile);
-    }
-
-    public void savePlayerAppearances() {
-        PlayerAppearanceLoader.save(_playerAppearances, _playerAppearanceFile);
-    }
-
-    public RadarConfig(File file, File playerAppearanceFile, KeyBinding settingsKey) {
+    public RadarConfig(File file, KeyBinding settingsKey) {
         _configFile = file;
-        _playerAppearanceFile = playerAppearanceFile;
         _settingsKey = settingsKey;
 
         _entities = new ArrayList<RadarEntityInfo>();
@@ -301,7 +279,7 @@ public class RadarConfig {
         _entities.add(new RadarEntityInfo(EntityXPOrb.class, "XP Orb", "icons/xp_orb.png", GroupType.Other));
         _entities.add(new RadarEntityInfo(EntityWither.class, "Wither", "icons/wither/wither.png", GroupType.Aggressive));
         _entities.add(new RadarEntityInfo(EntityWitherSkeleton.class, "Wither Skeleton", "icons/skeleton/wither_skeleton.png", GroupType.Aggressive));
-        //V1.11 and higher
+        //V1.11+
         _entities.add(new RadarEntityInfo(EntityLlama.class, "Llama", "icons/llama/llama.png", GroupType.Neutral));
         _entities.add(new RadarEntityInfo(EntityParrot.class, "Parrot", "icons/parrot/parrot.png", GroupType.Neutral));
         _entities.add(new RadarEntityInfo(EntityEvoker.class, "Evoker", "icons/illager/evoker.png", GroupType.Aggressive));

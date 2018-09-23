@@ -7,10 +7,12 @@ import java.awt.*;
  */
 public class PlayerTypeInfo {
     public Color color;
+    public String soundEventName;
     public boolean ping;
 
     public PlayerTypeInfo(Color color) {
         this.color = color;
+        this.soundEventName = "pling";
         this.ping = true;
     }
 }

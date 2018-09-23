@@ -16,10 +16,12 @@ public class GuiMainScreen extends GuiScreen {
     private static final int BUTTON_ID_ENABLE = 3;
     private static final int BUTTON_ID_MANAGE_PLAYERS = 4;
     private static final int BUTTON_ID_PLAYERS_SETTINGS = 5;
+    private static final int BUTTON_ID_PLAYER_STATUS = 6;
     private static final int BUTTON_ID_DONE = 100;
 
     private RadarConfig _config;
     private GuiScreen _parent;
+    private GuiButton _playerStatusButton;
     private GuiButton _enableButton;
 
     public GuiMainScreen(GuiScreen parent, RadarConfig config) {
@@ -41,6 +43,8 @@ public class GuiMainScreen extends GuiScreen {
         this.buttonList.add(new GuiButton(BUTTON_ID_MANAGE_PLAYERS, x, y, 200, 20, "Manage Players"));
         y += 24;
         this.buttonList.add(new GuiButton(BUTTON_ID_PLAYERS_SETTINGS, x, y, 200, 20, "Player Settings"));
+        y += 24;
+        this.buttonList.add(_playerStatusButton = new GuiButton(BUTTON_ID_PLAYER_STATUS, x, y, 200, 20, "Log Players Statuses:"));
         y += 24;
         this.buttonList.add(_enableButton = new GuiButton(BUTTON_ID_ENABLE, x, y, 100, 20, "Radar: "));
         this.buttonList.add(new GuiButton(BUTTON_ID_DONE, x + 101, y, 100, 20, "Done"));
@@ -66,6 +70,10 @@ public class GuiMainScreen extends GuiScreen {
             case BUTTON_ID_PLAYERS_SETTINGS:
                 mc.displayGuiScreen(new GuiPlayerSettingsScreen(this, _config));
                 break;
+            case BUTTON_ID_PLAYER_STATUS:
+                _config.setLogPlayerStatus(!_config.getLogPlayerStatus());
+                _config.save();
+                break;
             case BUTTON_ID_ENABLE:
                 _config.setEnabled(!_config.getEnabled());
                 _config.save();
@@ -78,6 +86,7 @@ public class GuiMainScreen extends GuiScreen {
 
     @Override
     public void updateScreen() {
+        _playerStatusButton.displayString = "Log Players Statuses: " + (_config.getLogPlayerStatus() ? "On" : "Off");
         _enableButton.displayString = "Radar: " + (_config.getEnabled() ? "On" : "Off");
     }
 

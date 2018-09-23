@@ -30,6 +30,10 @@ public class RadarConfigLoader {
         public boolean neutralPlayerPing;
         public boolean allyPlayerPing;
         public boolean enemyPlayerPing;
+        public String neutralSoundEventName;
+        public String allySoundEventName;
+        public String enemySoundEventName;
+        public Boolean logPlayerStatus;
         public List<String> disabledEntities;
         public List<String> disabledGroups;
         public List<String> allyPlayers;
@@ -47,12 +51,24 @@ public class RadarConfigLoader {
         info.radarY = config.getRadarY();
         info.iconScale = config.getIconScale();
         info.fontScale = config.getFontScale();
-        info.neutralPlayerColor = config.getPlayerTypeInfo(PlayerType.Neutral).color.getRGB();
-        info.allyPlayerColor = config.getPlayerTypeInfo(PlayerType.Ally).color.getRGB();
-        info.enemyPlayerColor = config.getPlayerTypeInfo(PlayerType.Enemy).color.getRGB();
-        info.neutralPlayerPing = config.getPlayerTypeInfo(PlayerType.Neutral).ping;
-        info.allyPlayerPing = config.getPlayerTypeInfo(PlayerType.Ally).ping;
-        info.enemyPlayerPing = config.getPlayerTypeInfo(PlayerType.Enemy).ping;
+
+        PlayerTypeInfo neutralPlayer = config.getPlayerTypeInfo(PlayerType.Neutral);
+        info.neutralPlayerColor = neutralPlayer.color.getRGB();
+        info.neutralPlayerPing = neutralPlayer.ping;
+        info.neutralSoundEventName = neutralPlayer.soundEventName;
+
+        PlayerTypeInfo allyPlayer = config.getPlayerTypeInfo(PlayerType.Ally);
+        info.allyPlayerColor = allyPlayer.color.getRGB();
+        info.allyPlayerPing = allyPlayer.ping;
+        info.allySoundEventName = allyPlayer.soundEventName;
+
+        PlayerTypeInfo enemyPlayer = config.getPlayerTypeInfo(PlayerType.Enemy);
+        info.enemyPlayerColor = enemyPlayer.color.getRGB();
+        info.enemyPlayerPing = enemyPlayer.ping;
+        info.enemySoundEventName = enemyPlayer.soundEventName;
+
+        info.logPlayerStatus = config.getLogPlayerStatus();
+        
         info.disabledEntities = new ArrayList<String>();
         info.disabledGroups = new ArrayList<String>();
         info.allyPlayers = new ArrayList<String>();
@@ -134,14 +150,19 @@ public class RadarConfigLoader {
         PlayerTypeInfo neutralInfo = config.getPlayerTypeInfo(PlayerType.Neutral);
         neutralInfo.color = new Color(info.neutralPlayerColor);
         neutralInfo.ping = info.neutralPlayerPing;
+        neutralInfo.soundEventName = SoundInfo.getByValue(info.neutralSoundEventName) == null ? "pling" : info.neutralSoundEventName;
 
         PlayerTypeInfo allyInfo = config.getPlayerTypeInfo(PlayerType.Ally);
         allyInfo.color = new Color(info.allyPlayerColor);
         allyInfo.ping = info.allyPlayerPing;
+        allyInfo.soundEventName = SoundInfo.getByValue(info.allySoundEventName) == null ? "pling" : info.allySoundEventName;
 
         PlayerTypeInfo enemyInfo = config.getPlayerTypeInfo(PlayerType.Enemy);
         enemyInfo.color = new Color(info.enemyPlayerColor);
         enemyInfo.ping = info.enemyPlayerPing;
+        enemyInfo.soundEventName = SoundInfo.getByValue(info.enemySoundEventName) == null ? "pling" : info.enemySoundEventName;
+
+        config.setLogPlayerStatus(info.logPlayerStatus == null || info.logPlayerStatus);
 
         if(info.disabledEntities != null) {
             for(String entityName : info.disabledEntities) {
