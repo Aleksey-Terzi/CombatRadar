@@ -364,6 +364,10 @@ public class Radar
 
             String playerName = TextFormatting.getTextWithoutFormattingCodes(p.getGameProfile().getName());
 
+            if(_config.isPlayerExcluded(playerName)) {
+                continue;
+            }
+
             _onlinePlayers.put(playerKey, playerName);
 
             if(oldOnlinePlayers == null || !oldOnlinePlayers.containsKey(playerKey)) {
@@ -409,7 +413,7 @@ public class Radar
     }
 
     private void sendMessage(Minecraft minecraft, MessageInfo messageInfo) {
-        ITextComponent text = new TextComponentString("[CombatRadar] ").setStyle(new Style().setColor(TextFormatting.DARK_AQUA));
+        ITextComponent text = new TextComponentString("[CR] ").setStyle(new Style().setColor(TextFormatting.DARK_AQUA));
 
         TextFormatting playerColor;
         PlayerType playerType = _config.getPlayerType(messageInfo.playerName);

@@ -48,6 +48,7 @@ public class RadarConfig {
     private Map<GroupType, Boolean> _groups;
     private Map<String, PlayerInfo> _players;
     private Map<PlayerType, PlayerTypeInfo> _playerTypes;
+    private List<String> _playersExcludedFromLog;
 
     // Calculated settings
     private boolean _isJourneyMapEnabled;
@@ -231,6 +232,27 @@ public class RadarConfig {
     public boolean getIsVoxelMapEnabled() { return _isVoxelMapEnabled; }
     public void setIsVoxelMapEnabled(boolean value) { _isVoxelMapEnabled = value; }
 
+    public List<String> getPlayersExcludedFromLog() { return _playersExcludedFromLog; }
+    public void setPlayersExcludedFromLog(List<String> value) {
+        _playersExcludedFromLog = value;
+
+        for(int i = 0; i < _playersExcludedFromLog.size(); i++) {
+            _playersExcludedFromLog.set(i, _playersExcludedFromLog.get(i).toUpperCase());
+        }
+    }
+
+    public boolean isPlayerExcluded(String playerName) {
+        String upperPlayerName = playerName.toUpperCase();
+
+        for(String p : _playersExcludedFromLog) {
+            if(upperPlayerName.startsWith(p)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public RadarConfig(File file, KeyBinding settingsKey) {
         _configFile = file;
         _settingsKey = settingsKey;
@@ -303,6 +325,9 @@ public class RadarConfig {
         _playerTypes.put(PlayerType.Neutral, new PlayerTypeInfo(Color.WHITE));
         _playerTypes.put(PlayerType.Ally, new PlayerTypeInfo(Color.GREEN));
         _playerTypes.put(PlayerType.Enemy, new PlayerTypeInfo(Color.YELLOW));
+
+        _playersExcludedFromLog = new ArrayList<String>();
+        _playersExcludedFromLog.add("~BTLP SLOT");
     }
 
     public void save() {

@@ -38,6 +38,7 @@ public class RadarConfigLoader {
         public List<String> disabledGroups;
         public List<String> allyPlayers;
         public List<String> enemyPlayers;
+        public List<String> playersExcludedFromLog;
     }
 
     public static void save(RadarConfig config, File file) {
@@ -71,8 +72,6 @@ public class RadarConfigLoader {
         
         info.disabledEntities = new ArrayList<String>();
         info.disabledGroups = new ArrayList<String>();
-        info.allyPlayers = new ArrayList<String>();
-        info.enemyPlayers = new ArrayList<String>();
 
         for(RadarEntityInfo entityInfo : config.getEntities()) {
             if(!entityInfo.getEnabled())
@@ -86,13 +85,10 @@ public class RadarConfigLoader {
         if(!config.isGroupEnabled(GroupType.Other))
             info.disabledGroups.add("Other");
 
-        for(String playerName : config.getPlayers(PlayerType.Ally)) {
-            info.allyPlayers.add(playerName);
-        }
+        info.allyPlayers = config.getPlayers(PlayerType.Ally);
+        info.enemyPlayers = config.getPlayers(PlayerType.Enemy);
 
-        for(String playerName : config.getPlayers(PlayerType.Enemy)) {
-            info.enemyPlayers.add(playerName);
-        }
+        info.playersExcludedFromLog = config.getPlayersExcludedFromLog();
 
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         String json = gson.toJson(info);
@@ -191,6 +187,10 @@ public class RadarConfigLoader {
             for(String playerName : info.enemyPlayers) {
                 config.setPlayerType(playerName, PlayerType.Enemy);
             }
+        }
+
+        if(info.playersExcludedFromLog != null) {
+            config.setPlayersExcludedFromLog(info.playersExcludedFromLog);
         }
 
         return true;
