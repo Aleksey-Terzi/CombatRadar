@@ -1,21 +1,17 @@
 package com.aleksey.combatradar.entities;
 
 import com.aleksey.combatradar.config.PlayerType;
-import com.mojang.authlib.GameProfile;
-import com.mojang.authlib.minecraft.MinecraftProfileTexture;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.math.Vector3f;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.entity.EntityOtherPlayerMP;
-import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.player.EnumPlayerModelParts;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.client.player.RemotePlayer;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.Entity;
 
 import java.awt.*;
-import java.util.Map;
-
-import static com.mumfrey.liteloader.gl.GL.*;
 
 /**
  * @author Aleksey Terzi
@@ -29,67 +25,61 @@ public class PlayerRadarEntity extends RadarEntity {
     }
 
     @Override
-    protected void renderInternal(Minecraft minecraft, float displayX, float displayY) {
-        EntityOtherPlayerMP player = (EntityOtherPlayerMP)getEntity();
+    protected void renderInternal(PoseStack poseStack, double displayX, double displayY, float partialTicks) {
+        Minecraft minecraft = Minecraft.getInstance();
+        RemotePlayer player = (RemotePlayer)getEntity();
+        float rotationYaw = minecraft.player.getViewYRot(partialTicks);
+        float scale = getSettings().iconScale * 1.7f;
 
-        glColor4f(1.0F, 1.0F, 1.0F, getSettings().iconOpacity);
-        glEnableBlend();
+        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, getSettings().iconOpacity);
+        RenderSystem.enableBlend();
 
-        glPushMatrix();
-        glTranslatef(displayX, displayY, 0);
-        glRotatef(minecraft.player.rotationYaw, 0.0F, 0.0F, 1.0F);
+        poseStack.pushPose();
+        poseStack.translate(displayX, displayY, 0);
+        poseStack.mulPose(Vector3f.ZP.rotationDegrees(rotationYaw));
 
-        glPushMatrix();
-        glScalef(getSettings().iconScale, getSettings().iconScale, getSettings().iconScale);
+        poseStack.pushPose();
+        poseStack.scale(scale, scale, scale);
+        renderPlayerIcon(poseStack, player);
+        poseStack.popPose();
 
-        try {
-            GameProfile gameProfile = player.getGameProfile();
-            Map<MinecraftProfileTexture.Type, MinecraftProfileTexture> texMap = minecraft.getSkinManager().loadSkinFromCache(gameProfile);
+        RenderSystem.disableBlend();
 
-            if (texMap.containsKey(MinecraftProfileTexture.Type.SKIN)) {
-                MinecraftProfileTexture profileTexture = texMap.get(MinecraftProfileTexture.Type.SKIN);
-                minecraft.getTextureManager().bindTexture(minecraft.getSkinManager().loadSkin(profileTexture, MinecraftProfileTexture.Type.SKIN));
-                Gui.drawScaledCustomSizeModalRect(-8, -8, 8, 8, 8, 8, 16, 16, 64, 64);
-            } else {
-                minecraft.getTextureManager().bindTexture(new ResourceLocation("icons/player.png"));
-                Gui.drawScaledCustomSizeModalRect(-8, -8, 0, 0, 8, 8, 16, 16, 8, 8);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        if (getSettings().showPlayerNames)
+            renderPlayerName(poseStack, player);
 
-        glDisableBlend();
-        glPopMatrix();
-
-        if (getSettings().showPlayerNames) {
-            Color color = _playerType == PlayerType.Ally ? getSettings().allyPlayerColor : (_playerType == PlayerType.Enemy ? getSettings().enemyPlayerColor : getSettings().neutralPlayerColor);
-
-            glPushMatrix();
-            glScalef(getSettings().fontScale, getSettings().fontScale, getSettings().fontScale);
-
-            String playerName = player.getName();
-            if (getSettings().showExtraPlayerInfo) {
-                playerName += " (" + (int)getDistanceToEntity(minecraft.player, player) + "m)(Y" + (int) player.posY + ")";
-            }
-            int yOffset = -4 + (int) ((getSettings().iconScale * getSettings().radarScale + 8));
-            drawCenteredString(minecraft.fontRenderer, playerName, 0, yOffset, color.getRGB());
-
-            glPopMatrix();
-        }
-
-        glPopMatrix();
+        poseStack.popPose();
     }
 
-    private static void drawCenteredString(FontRenderer fontRenderer, String text, int x, int y, int color)
-    {
-        fontRenderer.drawString(text, x - fontRenderer.getStringWidth(text) / 2, y, color, true);
+    private void renderPlayerIcon(PoseStack poseStack, RemotePlayer player) {
+        ResourceLocation skin = player.getSkinTextureLocation();
+
+        RenderSystem.setShaderTexture(0, skin);
+
+        Gui.blit(poseStack, -4, -4, 8, 8, 8, 8, 8, 8, 64, 64);
     }
 
-    private static float getDistanceToEntity(Entity e1, Entity e2)
-    {
-        float f = (float)(e1.posX - e2.posX);
-        float f1 = (float)(e1.posY - e2.posY);
-        float f2 = (float)(e1.posZ - e2.posZ);
-        return MathHelper.sqrt(f * f + f1 * f1 + f2 * f2);
+    private void renderPlayerName(PoseStack poseStack, RemotePlayer player) {
+        Minecraft minecraft = Minecraft.getInstance();
+
+        Color color = _playerType == PlayerType.Ally
+                ? getSettings().allyPlayerColor
+                : (_playerType == PlayerType.Enemy ? getSettings().enemyPlayerColor : getSettings().neutralPlayerColor);
+
+        poseStack.pushPose();
+        poseStack.scale(getSettings().fontScale, getSettings().fontScale, getSettings().fontScale);
+
+        String playerName = player.getScoreboardName();
+        if (getSettings().showExtraPlayerInfo) {
+            playerName += " (" + (int)minecraft.player.distanceTo(player) + "m)(Y" + player.getBlockY() + ")";
+        }
+
+        Font font = minecraft.font;
+        float yOffset = -4 + (int) ((getSettings().iconScale * getSettings().radarScale + 8));
+        float xOffset = -font.width(playerName) / 2;
+
+        font.draw(poseStack, playerName, xOffset, yOffset, color.getRGB());
+
+        poseStack.popPose();
     }
 }

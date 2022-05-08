@@ -1,34 +1,37 @@
 package com.aleksey.combatradar;
 
-import static com.mumfrey.liteloader.gl.GL.*;
-
 import com.aleksey.combatradar.config.PlayerType;
 import com.aleksey.combatradar.config.PlayerTypeInfo;
 import com.aleksey.combatradar.config.RadarConfig;
+import com.aleksey.combatradar.config.RadarEntityInfo;
 import com.aleksey.combatradar.entities.*;
+import com.mojang.authlib.GameProfile;
+import com.mojang.blaze3d.platform.Window;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.*;
+import com.mojang.math.Matrix4f;
+import com.mojang.math.Vector3f;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.entity.AbstractClientPlayer;
-import net.minecraft.client.entity.EntityOtherPlayerMP;
-import net.minecraft.client.gui.ScaledResolution;
-import net.minecraft.client.network.NetworkPlayerInfo;
-import net.minecraft.client.renderer.Tessellator;
-import net.minecraft.client.renderer.BufferBuilder;
-import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.item.EntityBoat;
-import net.minecraft.entity.item.EntityItem;
-import net.minecraft.entity.item.EntityMinecart;
-import net.minecraft.entity.item.EntityXPOrb;
-import net.minecraft.init.Items;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.util.SoundEvent;
-import net.minecraft.util.text.*;
-import net.minecraft.util.text.event.ClickEvent;
-import net.minecraft.util.text.event.HoverEvent;
+import net.minecraft.client.player.AbstractClientPlayer;
+import net.minecraft.client.player.RemotePlayer;
+import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.network.chat.*;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextComponent;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.ExperienceOrb;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.vehicle.AbstractMinecart;
+import net.minecraft.world.entity.vehicle.Boat;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import org.lwjgl.opengl.GL11;
 
 import java.util.*;
+import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * @author Aleksey Terzi
@@ -42,10 +45,10 @@ public class Radar
         public double posZ;
 
         public PlayerInfo(AbstractClientPlayer player) {
-            this.playerName = player.getName();
-            this.posX = player.posX;
-            this.posY = player.posY;
-            this.posZ = player.posZ;
+            this.playerName = player.getScoreboardName();
+            this.posX = player.getX();
+            this.posY = player.getY();
+            this.posZ = player.getZ();
         }
     }
 
@@ -81,6 +84,8 @@ public class Radar
         }
     }
 
+    private static final Pattern MinecraftSpecialCodes = Pattern.compile("(?i)§[0-9A-FK-OR]");
+
     private RadarConfig _config;
 
     // Calculated settings
@@ -96,228 +101,262 @@ public class Radar
     private HashMap<UUID, MessageInfo> _messages = new HashMap<>();
     private List<PlayerSoundInfo> _sounds = new ArrayList<>();
 
+    private final float[] _sinList = new float[361];
+    private final float[] _cosList = new float[361];
+
     public Radar(RadarConfig config) {
         _config = config;
+
+        for (int i = 0; i <= 360; i++) {
+            _sinList[i] = (float)Math.sin(i * Math.PI / 180.0D);
+            _cosList[i] = (float)Math.cos(i * Math.PI / 180.0D);
+        }
     }
 
-    public void calcSettings(Minecraft minecraft) {
-        ScaledResolution res = new ScaledResolution(minecraft);
-        int radarDiameter = (int) ((res.getScaledHeight() - 2) * _config.getRadarSize());
+    public void calcSettings() {
+        Window window = Minecraft.getInstance().getWindow();
+        int radarDiameter = (int) ((window.getGuiScaledHeight() - 2) * _config.getRadarSize());
 
         _radarRadius = radarDiameter / 2;
 
-        int windowInnerWidth = res.getScaledWidth() - radarDiameter;
-        int windowInnerHeight = res.getScaledHeight() - radarDiameter;
+        int windowInnerWidth = window.getGuiScaledWidth() - radarDiameter;
+        int windowInnerHeight = window.getGuiScaledHeight() - radarDiameter;
 
-        _radarDisplayX = _radarRadius + 1 + (int) (_config.getRadarX() * (windowInnerWidth - 2));
-        _radarDisplayY = _radarRadius + 1 + (int) (_config.getRadarY() * (windowInnerHeight - 2));
+        _radarDisplayX = _radarRadius + 1 + (int)(_config.getRadarX() * (windowInnerWidth - 2));
+        _radarDisplayY = _radarRadius + 1 + (int)(_config.getRadarY() * (windowInnerHeight - 2));
 
         _radarScale = (float) _radarRadius / _config.getRadarDistance();
     }
 
-    public void render(Minecraft minecraft)
+    public void render(PoseStack poseStack, float partialTicks)
     {
-        if(!_config.getEnabled() || _radarRadius == 0)
+        if(_radarRadius == 0)
             return;
 
-        glPushMatrix();
-        glTranslatef(_radarDisplayX, _radarDisplayY, 0);
-        glRotatef(-minecraft.player.rotationYaw, 0.0F, 0.0F, 1.0F);
+        float rotationYaw = Minecraft.getInstance().player.getViewYRot(partialTicks);
 
-        renderCircle(_radarRadius, true);
+        poseStack.pushPose();
+        poseStack.translate(_radarDisplayX, _radarDisplayY, 0);
+        poseStack.mulPose(Vector3f.ZP.rotationDegrees(-rotationYaw));
 
-        glLineWidth(2.0f);
-        renderCircle(_radarRadius, false);
-        glLineWidth(1.0f);
+        renderCircleBg(poseStack, _radarRadius);
+        renderCircleBorder(poseStack, _radarRadius);
+        renderLines(poseStack, _radarRadius);
 
-        renderLines(_radarRadius);
-        renderNonPlayerEntities(minecraft);
+        renderNonPlayerEntities(poseStack, partialTicks);
 
-        glRotatef(minecraft.player.rotationYaw, 0.0F, 0.0F, 1.0F);
-        renderTriangle();
+        poseStack.mulPose(Vector3f.ZP.rotationDegrees(rotationYaw));
+        renderTriangle(poseStack);
 
-        glRotatef(-minecraft.player.rotationYaw, 0.0F, 0.0F, 1.0F);
-        renderPlayerEntities(minecraft);
+        poseStack.mulPose(Vector3f.ZP.rotationDegrees(-rotationYaw));
+        renderPlayerEntities(poseStack, partialTicks);
 
-        glPopMatrix();
+        poseStack.popPose();
     }
 
-    private void renderNonPlayerEntities(Minecraft minecraft) {
-        glPushMatrix();
-        glScalef(_radarScale, _radarScale, _radarScale);
+    private void renderNonPlayerEntities(PoseStack poseStack, float partialTicks) {
+        poseStack.pushPose();
+        poseStack.scale(_radarScale, _radarScale, _radarScale);
 
         for(RadarEntity radarEntity : _entities) {
             if(!(radarEntity instanceof PlayerRadarEntity))
-                radarEntity.render(minecraft);
+                radarEntity.render(poseStack, partialTicks);
         }
 
-        glPopMatrix();
+        poseStack.popPose();
     }
 
-    private void renderPlayerEntities(Minecraft minecraft) {
-        glPushMatrix();
-        glScalef(_radarScale, _radarScale, _radarScale);
+    private void renderPlayerEntities(PoseStack poseStack, float partialTicks) {
+        poseStack.pushPose();
+        poseStack.scale(_radarScale, _radarScale, _radarScale);
 
         for(RadarEntity radarEntity : _entities) {
             if(radarEntity instanceof PlayerRadarEntity)
-                radarEntity.render(minecraft);
+                radarEntity.render(poseStack, partialTicks);
         }
 
-        glPopMatrix();
+        poseStack.popPose();
     }
 
-    private void renderTriangle() {
-        glRotatef(180.0F, 0.0F, 0.0F, 1.0F);
-        glColor4f(1f, 1f, 1f, _config.getRadarOpacity() + 0.5F);
-        glEnableBlend();
-        glDisableTexture2D();
-        GL11.glEnable(GL11.GL_LINE_SMOOTH);
-        glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+    private void renderTriangle(PoseStack poseStack) {
+        Matrix4f lastPose = poseStack.last().pose();
 
-        Tessellator tessellator = Tessellator.getInstance();
-        BufferBuilder buffer = tessellator.getBuffer();
-        buffer.begin(GL11.GL_TRIANGLES, DefaultVertexFormats.POSITION);
-        buffer.pos(0, 3, 0.0D).endVertex();
-        buffer.pos(3, - 3, 0.0D).endVertex();
-        buffer.pos(-3, -3, 0.0D).endVertex();
-        tessellator.draw();
-        GL11.glDisable(GL11.GL_LINE_SMOOTH);
+        poseStack.mulPose(Vector3f.ZP.rotationDegrees(180));
 
-        glEnableTexture2D();
-        glDisableBlend();
-        glRotatef(-180.0F, 0.0F, 0.0F, 1.0F);
+        RenderSystem.enableBlend();
+        RenderSystem.disableTexture();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.setShader(GameRenderer::getPositionShader);
+
+        GL11.glEnable(GL11.GL_POLYGON_SMOOTH);
+
+        renderTriangle(lastPose, 0, 0);
+        renderTriangle(lastPose, 1, 0.5f);
+
+        GL11.glDisable(GL11.GL_POLYGON_SMOOTH);
+
+        RenderSystem.enableTexture();
+        RenderSystem.disableBlend();
+
+        poseStack.mulPose(Vector3f.ZP.rotationDegrees(-180));
+    }
+
+    private void renderTriangle(Matrix4f lastPose, float color, float offset) {
+        RenderSystem.setShaderColor(color, color, color, 1);
+
+        Tesselator tesselator = Tesselator.getInstance();
+        BufferBuilder buffer = tesselator.getBuilder();
+        buffer.begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION);
+        buffer.vertex(lastPose, 0f, 3f - offset, 0).endVertex();
+        buffer.vertex(lastPose, 3f - offset, -3f + offset, 0).endVertex();
+        buffer.vertex(lastPose, -3f + offset, -3f + offset, 0).endVertex();
+        tesselator.end();
     }
 
 
-    private void renderLines(float radius) {
-        glLineWidth(2.0f);
-        glDisableTexture2D();
-        glDisableLighting();
-
+    private void renderLines(PoseStack poseStack, float radius) {
         final float cos45 = 0.7071f;
-        float diagonalInner = cos45 * _radarScale;
-        float diagonalOuter = cos45 * radius;
+        final float a = 0.25f;
+        float length = radius - a;
+        float b = length;
+        float d = cos45 * length;
+        float c = d + a / cos45;
 
-        Tessellator tessellator = Tessellator.getInstance();
-        BufferBuilder buffer = tessellator.getBuffer();
-        buffer.begin(GL_LINES, DefaultVertexFormats.POSITION);
+        float opacity = _config.getRadarOpacity() + 0.5f;
+        Matrix4f lastPose = poseStack.last().pose();
 
-        buffer.pos(0, -radius, 0f).endVertex();
-        buffer.pos(0, -_radarScale, 0f).endVertex();
-        buffer.pos(0, _radarScale, 0f).endVertex();
-        buffer.pos(0, radius, 0f).endVertex();
+        GL11.glEnable(GL11.GL_POLYGON_SMOOTH);
 
-        buffer.pos(-radius, 0, 0f).endVertex();
-        buffer.pos(-_radarScale, 0, 0f).endVertex();
-        buffer.pos(_radarScale, 0, 0f).endVertex();
-        buffer.pos(radius, 0, 0f).endVertex();
+        RenderSystem.setShaderColor(_config.getRadarColor().getRed() / 255.0f, _config.getRadarColor().getGreen() / 255.0f, _config.getRadarColor().getBlue() / 255.0f, opacity);
+        RenderSystem.enableBlend();
+        RenderSystem.disableTexture();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.setShader(GameRenderer::getPositionShader);
 
-        buffer.pos(-diagonalOuter, -diagonalOuter, 0f).endVertex();
-        buffer.pos(-diagonalInner, -diagonalInner, 0f).endVertex();
-        buffer.pos(diagonalInner, diagonalInner, 0f).endVertex();
-        buffer.pos(diagonalOuter, diagonalOuter, 0f).endVertex();
+        Tesselator tesselator = Tesselator.getInstance();
+        BufferBuilder buffer = tesselator.getBuilder();
+        buffer.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION);
 
-        buffer.pos(-diagonalOuter, diagonalOuter, 0f).endVertex();
-        buffer.pos(-diagonalInner, diagonalInner, 0f).endVertex();
-        buffer.pos(diagonalInner, -diagonalInner, 0f).endVertex();
-        buffer.pos(diagonalOuter, -diagonalOuter, 0f).endVertex();
+        buffer.vertex(lastPose, -a, -b, 0f).endVertex();
+        buffer.vertex(lastPose, -a, b, 0f).endVertex();
+        buffer.vertex(lastPose, a, b, 0f).endVertex();
+        buffer.vertex(lastPose, a, -b, 0f).endVertex();
 
-        tessellator.draw();
+        buffer.vertex(lastPose, -b, a, 0f).endVertex();
+        buffer.vertex(lastPose, b, a, 0f).endVertex();
+        buffer.vertex(lastPose, b, -a, 0f).endVertex();
+        buffer.vertex(lastPose, -b, -a, 0f).endVertex();
 
-        glDisableBlend();
-        glEnableTexture2D();
+        buffer.vertex(lastPose, -c, -d, 0f).endVertex();
+        buffer.vertex(lastPose, d, c, 0f).endVertex();
+        buffer.vertex(lastPose, c, d, 0f).endVertex();
+        buffer.vertex(lastPose, -d, -c, 0f).endVertex();
+
+        buffer.vertex(lastPose, -d, c, 0f).endVertex();
+        buffer.vertex(lastPose, c, -d, 0f).endVertex();
+        buffer.vertex(lastPose, d, -c, 0f).endVertex();
+        buffer.vertex(lastPose, -c, d, 0f).endVertex();
+
+        tesselator.end();
+
+        RenderSystem.enableTexture();
+        RenderSystem.disableBlend();
+
+        GL11.glDisable(GL11.GL_POLYGON_SMOOTH);
     }
 
-    private void renderCircle(double radius, boolean fill) {
-        float opacity = fill ? _config.getRadarOpacity() : _config.getRadarOpacity() + 0.5f;
-        int bufferType = fill ? GL_TRIANGLE_FAN : GL_LINE_LOOP;
+    private void renderCircleBg(PoseStack poseStack, float radius) {
+        float opacity = _config.getRadarOpacity();
+        Matrix4f lastPose = poseStack.last().pose();
 
-        glEnableBlend();
-        glDisableTexture2D();
-        GL11.glEnable(GL11.GL_LINE_SMOOTH);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glColor4f(_config.getRadarColor().getRed() / 255.0f, _config.getRadarColor().getGreen() / 255.0f, _config.getRadarColor().getBlue() / 255.0f, opacity);
+        RenderSystem.enableBlend();
+        RenderSystem.disableTexture();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.setShader(GameRenderer::getPositionShader);
+        RenderSystem.setShaderColor(_config.getRadarColor().getRed() / 255.0f, _config.getRadarColor().getGreen() / 255.0f, _config.getRadarColor().getBlue() / 255.0f, opacity);
 
-        Tessellator tessellator = Tessellator.getInstance();
-        BufferBuilder buffer = tessellator.getBuffer();
-        buffer.begin(bufferType, DefaultVertexFormats.POSITION);
+        Tesselator tesselator = Tesselator.getInstance();
+        BufferBuilder buffer = tesselator.getBuilder();
+        buffer.begin(VertexFormat.Mode.TRIANGLE_FAN, DefaultVertexFormat.POSITION);
 
         for (int i = 0; i <= 360; i++) {
-            double x = Math.sin(i * Math.PI / 180.0D) * radius;
-            double y = Math.cos(i * Math.PI / 180.0D) * radius;
-            buffer.pos(x, y, 0.0D).endVertex();
+            float x = _sinList[i] * radius;
+            float y = _cosList[i] * radius;
+            buffer.vertex(lastPose, x, y, 0).endVertex();
         }
-        tessellator.draw();
 
-        GL11.glDisable(GL_LINE_SMOOTH);
-        glEnableTexture2D();
-        glDisableBlend();
+        tesselator.end();
+
+        RenderSystem.enableTexture();
+        RenderSystem.disableBlend();
     }
 
-    public int scanEntities(Minecraft minecraft) {
+    private void renderCircleBorder(PoseStack poseStack, float radius) {
+        float opacity = _config.getRadarOpacity() + 0.5f;
+        Matrix4f lastPose = poseStack.last().pose();
+
+        GL11.glEnable(GL11.GL_POLYGON_SMOOTH);
+
+        RenderSystem.enableBlend();
+        RenderSystem.disableTexture();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.setShader(GameRenderer::getPositionShader);
+        RenderSystem.setShaderColor(_config.getRadarColor().getRed() / 255.0f, _config.getRadarColor().getGreen() / 255.0f, _config.getRadarColor().getBlue() / 255.0f, opacity);
+
+        Tesselator tesselator = Tesselator.getInstance();
+        BufferBuilder buffer = tesselator.getBuilder();
+        buffer.begin(VertexFormat.Mode.TRIANGLE_STRIP, DefaultVertexFormat.POSITION);
+
+        for (int i = 0; i <= 360; i++) {
+            float sin = _sinList[i];
+            float cos = _cosList[i];
+            float x1 = sin * (radius - 0.5f);
+            float y1 = cos * (radius - 0.5f);
+            float x2 = sin * radius;
+            float y2 = cos * radius;
+
+            buffer.vertex(lastPose, x1, y1, 0).endVertex();
+            buffer.vertex(lastPose, x2, y2, 0).endVertex();        }
+
+        tesselator.end();
+
+        RenderSystem.enableTexture();
+        RenderSystem.disableBlend();
+
+        GL11.glDisable(GL11.GL_POLYGON_SMOOTH);
+    }
+
+    public int scanEntities() {
         _entities.clear();
         _sounds.clear();
         _messages.clear();
 
-        scanRadarEntities(minecraft);
+        scanRadarEntities();
 
         if(_config.getLogPlayerStatus()) {
-            scanOnlinePlayers(minecraft);
+            scanOnlinePlayers();
         }
 
         return _entities.size();
     }
 
-    private void scanRadarEntities(Minecraft minecraft) {
+    private void scanRadarEntities() {
+        Minecraft minecraft = Minecraft.getInstance();
+
         Map<UUID, PlayerInfo> oldPlayers = _radarPlayers;
 
-        _radarPlayers = new HashMap<UUID, PlayerInfo>();
+        _radarPlayers = new HashMap<>();
 
         EntitySettings settings = createEntitySettings();
 
-        List<Entity> entities = minecraft.world.loadedEntityList;
-
+        Iterable<Entity> entities = minecraft.level.entitiesForRendering();
         for(Entity entity : entities) {
-            if(entity == minecraft.player || !_config.isEntityEnabled(entity))
+            if(entity == minecraft.player)
                 continue;
 
-            RadarEntity radarEntity;
-
-            if (entity instanceof EntityXPOrb) {
-                radarEntity = new CustomRadarEntity(entity, settings, "icons/xp_orb.png");
-            } else if (entity instanceof EntityItem) {
-                radarEntity = new ItemRadarEntity(entity, settings);
-            } else if (entity instanceof EntityOtherPlayerMP) {
-                PlayerType playerType = _config.getPlayerType(entity.getName());
-                radarEntity = new PlayerRadarEntity(entity, settings, playerType);
-
-                UUID playerKey = entity.getUniqueID();
-                PlayerInfo playerInfo = new PlayerInfo((EntityOtherPlayerMP)entity);
-
-                _radarPlayers.put(playerKey, playerInfo);
-
-                if(oldPlayers == null || !oldPlayers.containsKey(playerKey)) {
-                    PlayerTypeInfo playerTypeInfo = _config.getPlayerTypeInfo(playerType);
-
-                    if(playerTypeInfo.ping) {
-                        _sounds.add(new PlayerSoundInfo(playerTypeInfo.soundEventName, playerKey));
-                    }
-
-                    if(playerTypeInfo.ping || _config.getLogPlayerStatus()) {
-                       _messages.put(playerKey, new MessageInfo(playerInfo, MessageReason.Appeared, playerTypeInfo.ping));
-                    }
-                } else {
-                    oldPlayers.remove(playerKey);
-                }
-            } else if (entity instanceof EntityBoat) {
-                radarEntity = new ItemRadarEntity(entity, settings, new ItemStack(Items.BOAT));
-            } else if (entity instanceof EntityMinecart) {
-                radarEntity = new ItemRadarEntity(entity, settings, new ItemStack(Items.MINECART));
-            } else {
-                radarEntity = new LiveRadarEntity(entity, settings);
-            }
-
-            _entities.add(radarEntity);
+            ResourceLocation icon = _config.getEnabledIcon(entity);
+            if (icon != null)
+                addEntity(entity, settings, oldPlayers, icon);
         }
 
         if(oldPlayers != null) {
@@ -331,6 +370,46 @@ public class Radar
                 }
             }
         }
+    }
+
+    private void addEntity(Entity entity, EntitySettings settings, Map<UUID, PlayerInfo> oldPlayers, ResourceLocation icon) {
+        RadarEntity radarEntity;
+
+        if (entity instanceof ExperienceOrb) {
+            radarEntity = new CustomRadarEntity(entity, settings, icon);
+        } else if (entity instanceof ItemEntity) {
+            radarEntity = new ItemRadarEntity(entity, settings);
+        } else if (entity instanceof RemotePlayer) {
+            PlayerType playerType = _config.getPlayerType(entity.getScoreboardName());
+            radarEntity = new PlayerRadarEntity(entity, settings, playerType);
+
+            UUID playerKey = entity.getUUID();
+            PlayerInfo playerInfo = new PlayerInfo((RemotePlayer)entity);
+
+            _radarPlayers.put(playerKey, playerInfo);
+
+            if(oldPlayers == null || !oldPlayers.containsKey(playerKey)) {
+                PlayerTypeInfo playerTypeInfo = _config.getPlayerTypeInfo(playerType);
+
+                if(playerTypeInfo.ping) {
+                    _sounds.add(new PlayerSoundInfo(playerTypeInfo.soundEventName, playerKey));
+                }
+
+                if(playerTypeInfo.ping || _config.getLogPlayerStatus()) {
+                    _messages.put(playerKey, new MessageInfo(playerInfo, MessageReason.Appeared, playerTypeInfo.ping));
+                }
+            } else {
+                oldPlayers.remove(playerKey);
+            }
+        } else if (entity instanceof Boat) {
+            radarEntity = new ItemRadarEntity(entity, settings, new ItemStack(Items.OAK_BOAT));
+        } else if (entity instanceof AbstractMinecart) {
+            radarEntity = new ItemRadarEntity(entity, settings, new ItemStack(Items.MINECART));
+        } else {
+            radarEntity = new LiveRadarEntity(entity, settings, icon);
+        }
+
+        _entities.add(radarEntity);
     }
 
     private EntitySettings createEntitySettings() {
@@ -349,24 +428,25 @@ public class Radar
         return settings;
     }
 
-    private void scanOnlinePlayers(Minecraft minecraft) {
-        Collection<NetworkPlayerInfo> players = minecraft.getConnection().getPlayerInfoMap();
+    private void scanOnlinePlayers() {
+        Minecraft minecraft = Minecraft.getInstance();
+        Collection<net.minecraft.client.multiplayer.PlayerInfo> players = minecraft.getConnection().getOnlinePlayers();
         Map<UUID, String> oldOnlinePlayers = _onlinePlayers;
+        UUID currentPlayerId = minecraft.player.getUUID();
 
         _onlinePlayers = new HashMap<UUID, String>();
 
-        for(NetworkPlayerInfo p : players) {
-            UUID playerKey = p.getGameProfile().getId();
+        for(net.minecraft.client.multiplayer.PlayerInfo p : players) {
+            GameProfile profile = p.getProfile();
+            UUID playerKey = profile.getId();
 
-            if(playerKey.equals(minecraft.player.getUniqueID())) {
+            if(playerKey.equals(currentPlayerId))
                 continue;
-            }
 
-            String playerName = TextFormatting.getTextWithoutFormattingCodes(p.getGameProfile().getName());
-
-            if(_config.isPlayerExcluded(playerName)) {
+            String playerName = profile.getName();
+            String playerNameTrimmed = MinecraftSpecialCodes.matcher(playerName).replaceAll("");
+            if(_config.isPlayerExcluded(playerNameTrimmed))
                 continue;
-            }
 
             _onlinePlayers.put(playerKey, playerName);
 
@@ -398,13 +478,15 @@ public class Radar
         }
     }
 
-    public void playSounds(Minecraft minecraft) {
+    public void playSounds() {
         for(PlayerSoundInfo sound : _sounds) {
-            SoundHelper.playSound(minecraft, sound.soundEventName, sound.playerKey);
+            SoundHelper.playSound(sound.soundEventName, sound.playerKey);
         }
     }
 
-    public void sendMessages(Minecraft minecraft) {
+    public void sendMessages() {
+        Minecraft minecraft = Minecraft.getInstance();
+
         for(MessageInfo message : _messages.values()) {
             if(message.log) {
                 sendMessage(minecraft, message);
@@ -413,98 +495,102 @@ public class Radar
     }
 
     private void sendMessage(Minecraft minecraft, MessageInfo messageInfo) {
-        ITextComponent text = new TextComponentString("[CR] ").setStyle(new Style().setColor(TextFormatting.DARK_AQUA));
+        MutableComponent text = new TextComponent("[CR] ").withStyle(ChatFormatting.DARK_AQUA);
 
-        TextFormatting playerColor;
+        ChatFormatting playerColor;
         PlayerType playerType = _config.getPlayerType(messageInfo.playerName);
 
         switch(playerType) {
             case Ally:
-                playerColor = TextFormatting.GREEN;
+                playerColor = ChatFormatting.GREEN;
                 break;
             case Enemy:
-                playerColor = TextFormatting.DARK_RED;
+                playerColor = ChatFormatting.DARK_RED;
                 break;
             default:
-                playerColor = TextFormatting.WHITE;
+                playerColor = ChatFormatting.WHITE;
                 break;
         }
 
-        text = text.appendSibling(new TextComponentString(messageInfo.playerName).setStyle(new Style().setColor(playerColor)));
+        text = text.append(new TextComponent(messageInfo.playerName).withStyle(playerColor));
 
         String actionText;
-        TextFormatting actionColor;
+        ChatFormatting actionColor;
 
         switch(messageInfo.reason) {
             case Login:
                 actionText = " joined the game";
-                actionColor = messageInfo.playerInfo != null ? TextFormatting.YELLOW : TextFormatting.DARK_GREEN;
+                actionColor = messageInfo.playerInfo != null ? ChatFormatting.YELLOW : ChatFormatting.DARK_GREEN;
                 break;
             case Logout:
                 actionText = " left the game";
-                actionColor = TextFormatting.DARK_GREEN;
+                actionColor = ChatFormatting.DARK_GREEN;
                 break;
             case Appeared:
                 actionText = " appeared on radar";
-                actionColor = TextFormatting.YELLOW;
+                actionColor = ChatFormatting.YELLOW;
                 break;
             case Disappeared:
                 actionText = " disappeared from radar";
-                actionColor = TextFormatting.YELLOW;
+                actionColor = ChatFormatting.YELLOW;
                 break;
             default:
                 return;
         }
 
-        text = text.appendSibling(new TextComponentString(actionText).setStyle(new Style().setColor(actionColor)));
+        text = text.append(new TextComponent(actionText).withStyle(actionColor));
 
         if(messageInfo.playerInfo != null) {
-            ITextComponent coordText;
+            Component coordText;
 
             if(_config.getIsJourneyMapEnabled()) {
                 coordText = getJourneyMapCoord(messageInfo.playerInfo);
             } else if(_config.getIsVoxelMapEnabled()) {
                 coordText = getVoxelMapCoord(messageInfo.playerInfo);
             } else {
-                coordText = new TextComponentString(getChatCoordText(messageInfo.playerInfo, false, true)).setStyle(new Style().setColor(actionColor));
+                coordText = new TextComponent(getChatCoordText(messageInfo.playerInfo, false, true))
+                        .withStyle(actionColor);
             }
 
             text = text
-                    .appendSibling(new TextComponentString(" at ").setStyle(new Style().setColor(actionColor)))
-                    .appendSibling(coordText);
+                    .append(new TextComponent(" at ").withStyle(actionColor))
+                    .append(coordText);
         }
 
-        minecraft.player.sendMessage(text);
+        minecraft.player.sendMessage(text, minecraft.player.getUUID());
     }
 
-    private static ITextComponent getJourneyMapCoord(PlayerInfo playerInfo) {
-        ITextComponent hover = new TextComponentString("JourneyMap: ").setStyle(new Style().setColor(TextFormatting.YELLOW));
-        hover = hover.appendSibling(new TextComponentString("Click to create Waypoint.\nCtrl+Click to view on map.").setStyle(new Style().setColor(TextFormatting.AQUA)));
+    private static Component getJourneyMapCoord(PlayerInfo playerInfo) {
+        MutableComponent hover = new TextComponent("JourneyMap: ")
+                .withStyle(ChatFormatting.YELLOW)
+                .append(new TextComponent("Click to create Waypoint.\nCtrl+Click to view on map.")
+                        .withStyle(ChatFormatting.AQUA)
+                );
 
         HoverEvent hoverEvent = new HoverEvent(HoverEvent.Action.SHOW_TEXT, hover);
         ClickEvent clickEvent = new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/jm wpedit " + getChatCoordText(playerInfo, true, true));
 
-        Style coordStyle = new Style()
-                .setClickEvent(clickEvent)
-                .setHoverEvent(hoverEvent)
-                .setColor(TextFormatting.AQUA);
+        Style coordStyle = Style.EMPTY
+                .withClickEvent(clickEvent)
+                .withHoverEvent(hoverEvent)
+                .withColor(ChatFormatting.AQUA);
 
-        return new TextComponentString(getChatCoordText(playerInfo, false, true)).setStyle(coordStyle);
+        return new TextComponent(getChatCoordText(playerInfo, false, true)).setStyle(coordStyle);
     }
 
-    private static ITextComponent getVoxelMapCoord(PlayerInfo playerInfo) {
-        ITextComponent hover = new TextComponentString("Click to highlight coordinate,\nor control-click to add/edit waypoint.")
-                .setStyle(new Style().setColor(TextFormatting.WHITE));
+    private static Component getVoxelMapCoord(PlayerInfo playerInfo) {
+        Component hover = new TextComponent("Click to highlight coordinate,\nor Ctrl-Click to add/edit waypoint.")
+                .withStyle(ChatFormatting.WHITE);
 
         HoverEvent hoverEvent = new HoverEvent(HoverEvent.Action.SHOW_TEXT, hover);
         ClickEvent clickEvent = new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/newWaypoint " + getChatCoordText(playerInfo, true, false));
 
-        Style coordStyle = new Style()
-                .setClickEvent(clickEvent)
-                .setHoverEvent(hoverEvent)
-                .setColor(TextFormatting.AQUA);
+        Style coordStyle = Style.EMPTY
+                .withClickEvent(clickEvent)
+                .withHoverEvent(hoverEvent)
+                .withColor(ChatFormatting.AQUA);
 
-        return new TextComponentString(getChatCoordText(playerInfo, false, true)).setStyle(coordStyle);
+        return new TextComponent(getChatCoordText(playerInfo, false, true)).setStyle(coordStyle);
     }
 
     private static String getChatCoordText(PlayerInfo playerInfo, boolean includeName, boolean includeBrackets) {

@@ -73,7 +73,7 @@ public class RadarConfigLoader {
         info.disabledEntities = new ArrayList<String>();
         info.disabledGroups = new ArrayList<String>();
 
-        for(RadarEntityInfo entityInfo : config.getEntities()) {
+        for(RadarEntityInfo entityInfo : config.getEntityList()) {
             if(!entityInfo.getEnabled())
                 info.disabledEntities.add(entityInfo.getName());
         }

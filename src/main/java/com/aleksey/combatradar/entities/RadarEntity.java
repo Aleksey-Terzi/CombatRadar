@@ -1,7 +1,10 @@
 package com.aleksey.combatradar.entities;
 
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
-import net.minecraft.entity.Entity;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.util.Mth;
 
 /**
  * @author Aleksey Terzi
@@ -23,16 +26,30 @@ public abstract class RadarEntity {
         return _settings;
     }
 
-    public final void render(Minecraft minecraft) {
-        double displayX = minecraft.player.posX - _entity.posX;
-        double displayZ = minecraft.player.posZ - _entity.posZ;
-        double distanceSq = displayX * displayX + displayZ * displayZ;
+    public final void render(PoseStack poseStack, float partialTicks) {
+        Player player = Minecraft.getInstance().player;
+
+        double displayX = getPartialX(player, partialTicks) - getPartialX(_entity, partialTicks);
+        double displayZ = getPartialZ(player, partialTicks) - getPartialZ(_entity, partialTicks); // Convert to 2D where Z is Y
+        double distanceSq = Mth.lengthSquared(displayX, displayZ);
 
         if(distanceSq > _settings.radarDistanceSq)
             return;
 
-        renderInternal(minecraft, (float)displayX, (float)displayZ);
+        renderInternal(poseStack, displayX, displayZ, partialTicks);
     }
 
-    protected abstract void renderInternal(Minecraft minecraft, float displayX, float displayY);
+    private static double getPartialX(Entity entity, float partialTicks) {
+        return getPartial(entity.xOld, entity.getX(), partialTicks);
+    }
+
+    private static double getPartialZ(Entity entity, float partialTicks) {
+        return getPartial(entity.zOld, entity.getZ(), partialTicks);
+    }
+
+    private static double getPartial(double oldValue, double newValue, float partialTicks) {
+        return oldValue + (newValue - oldValue) * partialTicks;
+    }
+
+    protected abstract void renderInternal(PoseStack poseStack, double displayX, double displayY, float partialTicks);
 }

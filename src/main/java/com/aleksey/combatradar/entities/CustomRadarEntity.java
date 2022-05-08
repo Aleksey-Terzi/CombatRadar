@@ -1,12 +1,12 @@
 package com.aleksey.combatradar.entities;
 
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.math.Vector3f;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
-import net.minecraft.entity.Entity;
-import net.minecraft.util.ResourceLocation;
-
-import static com.mumfrey.liteloader.gl.GL.*;
-import static com.mumfrey.liteloader.gl.GL.glDisableBlend;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.Entity;
 
 /**
  * @author Aleksey Terzi
@@ -14,28 +14,30 @@ import static com.mumfrey.liteloader.gl.GL.glDisableBlend;
 public class CustomRadarEntity extends RadarEntity {
     private ResourceLocation _resourceLocation;
 
-    public CustomRadarEntity(Entity entity, EntitySettings settings, String resourcePath) {
+    public CustomRadarEntity(Entity entity, EntitySettings settings, ResourceLocation icon) {
         super(entity, settings);
 
-        _resourceLocation = new ResourceLocation("combatradar", resourcePath);
+        _resourceLocation = icon;
     }
 
     @Override
-    protected void renderInternal(Minecraft minecraft, float displayX, float displayY) {
+    protected void renderInternal(PoseStack poseStack, double displayX, double displayY, float partialTicks) {
+        Minecraft minecraft = Minecraft.getInstance();
         float iconScale = getSettings().iconScale;
+        float rotationYaw = minecraft.player.getViewYRot(partialTicks);
 
-        minecraft.getTextureManager().bindTexture(_resourceLocation);
-        glColor4f(1.0F, 1.0F, 1.0F, getSettings().iconOpacity);
-        glEnableBlend();
+        RenderSystem.setShaderColor(1, 1, 1, getSettings().iconOpacity);
+        RenderSystem.enableBlend();
 
-        glPushMatrix();
-        glTranslatef(displayX, displayY, 0);
-        glRotatef(minecraft.player.rotationYaw, 0.0F, 0.0F, 1.0F);
-        glScalef(iconScale, iconScale, iconScale);
+        poseStack.pushPose();
+        poseStack.translate(displayX, displayY, 0);
+        poseStack.mulPose(Vector3f.ZP.rotationDegrees(rotationYaw));
+        poseStack.scale(iconScale, iconScale, iconScale);
 
-        Gui.drawModalRectWithCustomSizedTexture(-8, -8, 0, 0, 16, 16, 16, 16);
+        Gui.blit(poseStack, -8, -8, 0, 0, 16, 16, 16, 16);
 
-        glPopMatrix();
-        glDisableBlend();
+        poseStack.popPose();
+
+        RenderSystem.disableBlend();
     }
 }

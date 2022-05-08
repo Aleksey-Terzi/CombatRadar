@@ -1,16 +1,12 @@
 package com.aleksey.combatradar.entities;
 
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.math.Vector3f;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
-import net.minecraft.client.renderer.BufferBuilder;
-import net.minecraft.client.renderer.Tessellator;
-import net.minecraft.client.renderer.entity.*;
-import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.passive.EntityHorse;
-import net.minecraft.util.ResourceLocation;
-
-import static com.mumfrey.liteloader.gl.GL.*;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.Entity;
 
 /**
  * @author Aleksey Terzi
@@ -20,62 +16,32 @@ public class LiveRadarEntity extends RadarEntity {
 
     private ResourceLocation _resourceLocation;
 
-    public LiveRadarEntity(Entity entity, EntitySettings settings) {
+    public LiveRadarEntity(Entity entity, EntitySettings settings, ResourceLocation icon) {
         super(entity, settings);
+
+        _resourceLocation = icon;
     }
 
     @Override
-    protected void renderInternal(Minecraft minecraft, float displayX, float displayY) {
-        ResourceLocation resourceLocation = getResourceLocation(minecraft);
-
-        if (resourceLocation == null)
-            return;
-
+    protected void renderInternal(PoseStack poseStack, double displayX, double displayY, float partialTicks) {
+        Minecraft minecraft = Minecraft.getInstance();
         float iconScale = getSettings().iconScale;
+        float rotationYaw = minecraft.player.getViewYRot(partialTicks);
 
-        minecraft.getTextureManager().bindTexture(resourceLocation);
-        glColor4f(1.0F, 1.0F, 1.0F, getSettings().iconOpacity);
-        glEnableBlend();
+        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, getSettings().iconOpacity);
+        RenderSystem.enableBlend();
 
-        glPushMatrix();
-        glTranslatef(displayX, displayY, 0);
-        glRotatef(minecraft.player.rotationYaw, 0.0F, 0.0F, 1.0F);
-        glScalef(iconScale, iconScale, iconScale);
+        poseStack.pushPose();
+        poseStack.translate(displayX, displayY, 0);
+        poseStack.mulPose(Vector3f.ZP.rotationDegrees(rotationYaw));
+        poseStack.scale(iconScale, iconScale, iconScale);
 
-        Gui.drawModalRectWithCustomSizedTexture(-8, -8, 0, 0, 16, 16, 16, 16);
+        RenderSystem.setShaderTexture(0, _resourceLocation);
 
-        glPopMatrix();
-        glDisableBlend();
-    }
+        Gui.blit(poseStack, -8, -8, 0, 0, 16, 16, 16, 16);
 
-    private ResourceLocation getResourceLocation(Minecraft minecraft) {
-        if(_resourceLocation == null) {
-            try {
-                RenderManager renderManager = minecraft.getRenderManager();
-                Render render = renderManager.getEntityRenderObject(getEntity());
+        poseStack.popPose();
 
-                if (render instanceof RenderHorse) {
-                    EntityHorse horseEntity = (EntityHorse) getEntity();
-                    int horseVariant = (0xff & horseEntity.getHorseVariant()) % 7;
-
-                    _resourceLocation = new ResourceLocation("combatradar", "icons/horse/horse_" + HORSE_VARIANTS[horseVariant] + ".png");
-                } else if (render instanceof RenderLlama) {
-                    _resourceLocation = new ResourceLocation("combatradar", "icons/llama/llama.png");
-                } else if (render instanceof RenderParrot) {
-                    _resourceLocation = new ResourceLocation("combatradar", "icons/parrot/parrot.png");
-                } else if (render instanceof RenderShulker) {
-                    _resourceLocation = new ResourceLocation("combatradar", "icons/shulker/shulker.png");
-                } else if (render instanceof RenderGhast) {
-                    _resourceLocation = new ResourceLocation("combatradar", "icons/ghast/ghast.png");
-                } else {
-                    ResourceLocation original = ResourceHelper.getEntityTexture(render, getEntity());
-                    _resourceLocation = new ResourceLocation("combatradar", original.getResourcePath().replace("textures/entity/", "icons/"));
-                }
-            } catch (Throwable e) {
-                System.out.println("Can't get entityTexture for " + getEntity().getName());
-            }
-        }
-
-        return _resourceLocation;
+        RenderSystem.disableBlend();
     }
 }
