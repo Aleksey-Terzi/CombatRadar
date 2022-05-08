@@ -1,14 +1,14 @@
-#CombatRadar:
+# CombatRadar:
 
 Radar that helps you to find mobs and players.
 
-###Requirements:
+### Requirements:
 - Java
-- LiteLoader
+- Forge
 
-####Copyright and  License:
+#### Copyright and  License:
 
-Copyright 2018 Aleksey Terzi.
+Copyright 2022 Aleksey Terzi.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
