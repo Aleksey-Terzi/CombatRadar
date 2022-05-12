@@ -4,7 +4,7 @@ Radar that helps you to find mobs and players.
 
 ### Requirements:
 - Java
-- Forge
+- Forge or Fabric with Fabric API
 
 #### Copyright and  License:
 
