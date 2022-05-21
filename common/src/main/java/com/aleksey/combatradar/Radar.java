@@ -434,7 +434,7 @@ public class Radar
         Map<UUID, String> oldOnlinePlayers = _onlinePlayers;
         UUID currentPlayerId = minecraft.player.getUUID();
 
-        _onlinePlayers = new HashMap<UUID, String>();
+        _onlinePlayers = new HashMap<>();
 
         for(net.minecraft.client.multiplayer.PlayerInfo p : players) {
             GameProfile profile = p.getProfile();

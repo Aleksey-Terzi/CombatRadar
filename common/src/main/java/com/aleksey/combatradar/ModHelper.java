@@ -20,7 +20,16 @@ public class ModHelper {
     private RadarConfig _config;
     private Radar _radar;
 
-    public RadarConfig init(Logger logger) {
+    private KeyMapping _settingsKey;
+    public KeyMapping getSettingsKey() {
+        return _settingsKey;
+    }
+
+    public ModHelper() {
+        _settingsKey = new KeyMapping("Combat Radar Settings", GLFW.GLFW_KEY_R, "Combat Radar");
+    }
+
+    public void init(Logger logger) {
         _logger = logger;
 
         File gameDirectory = Minecraft.getInstance().gameDirectory;
@@ -29,9 +38,8 @@ public class ModHelper {
             configDir.mkdir();
 
         File configFile = new File(configDir, "config.json");
-        KeyMapping settingsKey = new KeyMapping("Combat Radar Settings", GLFW.GLFW_KEY_R, "Combat Radar");
 
-        _config = new RadarConfig(configFile, settingsKey);
+        _config = new RadarConfig(configFile, _settingsKey);
 
         if(!configFile.isFile()) {
             try {
@@ -49,8 +57,6 @@ public class ModHelper {
         _config.setIsVoxelMapEnabled(isVoxelMapEnabled());
 
         _radar = new Radar(_config);
-
-        return _config;
     }
 
     public void tick() {

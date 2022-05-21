@@ -10,7 +10,7 @@
   "license": "Apache",
   "environment": "client",
   "entrypoints": {
-    "main": [
+    "client": [
       "com.aleksey.combatradar.fabric.FabricModCombatRadar"
     ]
   },

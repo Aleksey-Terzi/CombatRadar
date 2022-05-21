@@ -6,7 +6,6 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.TextComponent;
-import org.lwjgl.glfw.GLFW;
 
 import java.awt.*;
 
@@ -77,7 +76,7 @@ public class MainScreen extends Screen {
 
     @Override
     public void render(PoseStack poseStack, int mouseX, int mouseY, float partialTicks) {
-        String keyName = GLFW.glfwGetKeyName(_config.getSettingsKey().getDefaultKey().getValue(), 0).toUpperCase();
+        String keyName = _config.getSettingsKey().getTranslatedKeyMessage().getString().toUpperCase();
 
         RenderSystem.setShaderColor(1, 1, 1, 0.75f);
 

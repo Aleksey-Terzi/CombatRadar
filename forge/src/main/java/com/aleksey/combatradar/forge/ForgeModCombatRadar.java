@@ -30,7 +30,13 @@ public class ForgeModCombatRadar {
     }
 
     public void clientSetup(final FMLClientSetupEvent event) {
-        init();
+        _modHelper = new ModHelper();
+
+        ClientRegistry.registerKeyBinding(_modHelper.getSettingsKey());
+
+        _modHelper.init(LOGGER);
+
+        LOGGER.info("[CombatRadar]: mod enabled");
     }
 
     @SubscribeEvent
@@ -49,15 +55,5 @@ public class ForgeModCombatRadar {
     public void onClientChat(ClientChatReceivedEvent event) {
         if (_modHelper.processChat(event.getMessage()))
             event.setCanceled(true);
-    }
-
-    private void init() {
-        _modHelper = new ModHelper();
-
-        var config = _modHelper.init(LOGGER);
-
-        ClientRegistry.registerKeyBinding(config.getSettingsKey());
-
-        LOGGER.info("[CombatRadar]: mod enabled");
     }
 }
