@@ -104,6 +104,10 @@ public class Radar
     private final float[] _sinList = new float[361];
     private final float[] _cosList = new float[361];
 
+    public int getRadarRadius() { return _radarRadius; }
+    public int getRadarDisplayX() { return _radarDisplayX; }
+    public int getRadarDisplayY() { return _radarDisplayY; }
+
     public Radar(RadarConfig config) {
         _config = config;
 

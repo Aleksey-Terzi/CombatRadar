@@ -19,6 +19,7 @@ public class ModHelper {
     private Logger _logger;
     private RadarConfig _config;
     private Radar _radar;
+    private Speedometer _speedometer;
 
     private KeyMapping _settingsKey;
     public KeyMapping getSettingsKey() {
@@ -57,6 +58,7 @@ public class ModHelper {
         _config.setIsVoxelMapEnabled(isVoxelMapEnabled());
 
         _radar = new Radar(_config);
+        _speedometer = new Speedometer();
     }
 
     public void tick() {
@@ -70,6 +72,9 @@ public class ModHelper {
             _radar.scanEntities();
             _radar.playSounds();
             _radar.sendMessages();
+
+            if (_config.getSpeedometerEnabled())
+                _speedometer.calc();
         }
 
         if (!minecraft.options.hideGui && minecraft.screen == null && _config.getSettingsKey().consumeClick()) {
@@ -88,7 +93,7 @@ public class ModHelper {
                     _config.save();
                 }
             } else {
-                minecraft.setScreen(new MainScreen(minecraft.screen, _config));
+                minecraft.setScreen(new MainScreen(minecraft.screen, _config, _speedometer));
             }
         }
     }
@@ -105,6 +110,8 @@ public class ModHelper {
 
         _radar.render(poseStack, partialTicks);
 
+        if (_config.getSpeedometerEnabled())
+            _speedometer.render(poseStack, _radar.getRadarDisplayX(), _radar.getRadarDisplayY(), _radar.getRadarRadius());
     }
 
     public boolean processChat(Component message) {

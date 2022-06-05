@@ -43,6 +43,7 @@ public class RadarConfig {
     private File _configFile;
     private KeyMapping _settingsKey;
     private boolean _enabled = true;
+    private boolean _speedometerEnabled = false;
     private float _radarOpacity = 0.5f;
     private Color _radarColor = new Color(128, 128, 128);
     private float _radarSize = 0.4f;
@@ -69,6 +70,9 @@ public class RadarConfig {
 
     public boolean getEnabled() { return _enabled; }
     public void setEnabled(boolean value) { _enabled = value; }
+
+    public boolean getSpeedometerEnabled() { return _speedometerEnabled; }
+    public void setSpeedometerEnabled(boolean value) { _speedometerEnabled = value; }
 
     public float getRadarOpacity() { return _radarOpacity; }
     public boolean setRadarOpacity(float value) {
